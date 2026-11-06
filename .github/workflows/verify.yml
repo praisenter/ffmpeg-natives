@@ -1,0 +1,129 @@
+name: Verify
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: false
+        default: ''
+    outputs:
+      version:
+        value: ${{ jobs.build.outputs.version }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: '25'
+          cache: maven
+      - name: Read artifact version
+        id: metadata
+        shell: pwsh
+        run: |
+          [xml] $pom = Get-Content pom.xml
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "version=$($pom.project.version)"
+      - name: Package all classifiers
+        run: ./.github/scripts/package.ps1
+      - name: Validate archives and Maven attachments
+        run: |
+          foreach ($classifier in @('windows-x86_64', 'linux-x86_64', 'macos-x86_64', 'macos-aarch64')) {
+            ./.github/scripts/test.ps1 -Classifier $classifier -ArchiveOnly
+          }
+          mvn -B -ntp verify
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ffmpeg-distributions
+          path: |
+            target/distributions/*.zip
+            target/distributions/SHA256SUMS
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  native:
+    needs: build
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            classifier: windows-x86_64
+            architecture: x64
+            runner-architecture: X64
+          - runner: ubuntu-24.04
+            classifier: linux-x86_64
+            architecture: x64
+            runner-architecture: X64
+          - runner: macos-15-intel
+            classifier: macos-x86_64
+            architecture: x64
+            runner-architecture: X64
+          - runner: macos-15
+            classifier: macos-aarch64
+            architecture: aarch64
+            runner-architecture: ARM64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+      - name: Assert native runner architecture
+        shell: pwsh
+        env:
+          EXPECTED_ARCHITECTURE: ${{ matrix.runner-architecture }}
+        run: |
+          if ($env:RUNNER_ARCH -ne $env:EXPECTED_ARCHITECTURE) {
+            throw "Expected $env:EXPECTED_ARCHITECTURE runner, got $env:RUNNER_ARCH"
+          }
+      - uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: '25'
+          architecture: ${{ matrix.architecture }}
+          cache: maven
+      - uses: actions/download-artifact@v7
+        with:
+          name: ffmpeg-distributions
+          path: target/distributions
+      - name: Check archive, install exact classifier, and test Maven unpacking
+        shell: pwsh
+        env:
+          CLASSIFIER: ${{ matrix.classifier }}
+          ARTIFACT_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          $name = "ffmpeg-$env:ARTIFACT_VERSION-$env:CLASSIFIER.zip"
+          $archive = Join-Path 'target/distributions' $name
+          ./.github/scripts/test.ps1 -Classifier $env:CLASSIFIER -ArchiveOnly
+          mvn -B -ntp org.apache.maven.plugins:maven-install-plugin:3.1.4:install-file "-Dfile=$archive" -DpomFile=pom.xml "-Dclassifier=$env:CLASSIFIER" -Dpackaging=zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          mvn -B -ntp -f src/it/consumer/pom.xml clean verify "-Dffmpeg.classifier=$env:CLASSIFIER" "-Dffmpeg.artifact.version=$env:ARTIFACT_VERSION"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run native encode/probe, license and runtime checks
+        env:
+          CLASSIFIER: ${{ matrix.classifier }}
+        run: ./.github/scripts/test.ps1 -Classifier $env:CLASSIFIER

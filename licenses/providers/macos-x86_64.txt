@@ -1,0 +1,19 @@
+FFmpeg / FFprobe - macOS Intel x86_64
+
+Binary provider: Martin Riedl
+Provider website: https://ffmpeg.martin-riedl.de/
+Build scripts: https://git.martin-riedl.de/ffmpeg/build-script
+Build: 1774556648_8.1
+FFmpeg version: 8.1
+Build report: https://ffmpeg.martin-riedl.de/download/macos/amd64/1774556648_8.1/versions.txt
+
+The provider's ffmpeg.zip and ffprobe.zip contain executables, not license
+documents. No license document from another platform's archive is substituted
+as this provider's notice. COPYING.GPLv3.txt is a common reference license text;
+its inclusion does not establish this build's complete applicable licensing.
+The binaries and existing signatures are preserved without modification.
+Archive and executable hashes are recorded in build-info.properties.
+
+This provenance notice is maintained by this packaging project, not the
+upstream provider. The exact build's licenses, copyright/dependency notices
+and corresponding source still need auditing. See SOURCES.md before redistribution.

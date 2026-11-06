@@ -1,0 +1,16 @@
+FFmpeg / FFprobe - Windows x86_64
+
+Binary provider: BtbN/FFmpeg-Builds
+Provider repository: https://github.com/BtbN/FFmpeg-Builds
+Build: autobuild-2026-03-31-13-11
+FFmpeg revision: n8.1-7-ga3475e2554
+Variant: win64-gpl-8.1 (non-shared)
+Release: https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-03-31-13-11
+
+The original license document from this platform's archive is retained as
+UPSTREAM-LICENSE.txt. The binaries are copied without modification; their
+archive and executable hashes are recorded in build-info.properties.
+
+This provenance notice is maintained by this packaging project, not the
+upstream provider. It does not replace required upstream/dependency notices
+or corresponding source. Redistribution approval is still pending; see SOURCES.md.
